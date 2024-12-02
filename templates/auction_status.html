@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Auction Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Auction Status</h1>
+    <p>Status: {{ auction_data['status'] }}</p>
+    <p>Current Round: {{ auction_data['current_round'] }}</p>
+</body>
+</html>

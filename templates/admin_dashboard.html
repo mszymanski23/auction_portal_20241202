@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Administratora</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="admin-container">
+        <h2>Panel Administratora</h2>
+        <p><strong>Administrator: </strong>{{ session['username'] }}</p>
+        <p><strong>Aktualny status aukcji:</strong> {{ 'Trwa Aukcja' if auction_running else 'Aukcja nie rozpoczęta' }}</p>
+
+        <h3>Ustawienia rundy:</h3>
+        <form action="{{ url_for('update_round_settings') }}" method="POST">
+            <label for="round_time">Czas trwania rundy:</label>
+            <input type="number" name="round_time" value="{{ round_time }}" required>
+            <label for="break_time">Czas trwania przerwy technicznej:</label>
+            <input type="number" name="break_time" value="{{ break_time }}" required>
+            <label for="start_price">Cena wywoławcza:</label>
+            <input type="number" name="start_price" value="{{ start_price }}" required>
+            <label for="raise_amount">Kwota przebicia:</label>
+            <input type="number" name="raise_amount" value="{{ raise_amount }}" required>
+            <button type="submit">Zapisz zmiany</button>
+        </form>
+
+        <h3>Start Aukcji:</h3>
+        <form action="{{ url_for('start_auction') }}" method="POST">
+            <button type="submit">Rozpocznij Aukcję</button>
+        </form>
+
+        <h3>Uczestnicy:</h3>
+        <ul>
+            {% for user in users_online %}
+                <li>{{ user }}</li>
+            {% endfor %}
+        </ul>
+
+        <h3>Przebieg aukcji:</h3>
+        <form action="{{ url_for('end_round') }}" method="POST">
+            <button type="submit">Zakończ rundę</button>
+        </form>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <ul>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</body>
+</html>

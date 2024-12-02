@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+</head>
+<body class="container">
+    <h1 class="my-4">User Panel</h1>
+    <div>
+        <p>Welcome, {{ user }}!</p>
+        <p>Time left in round: <span id="timer"></span></p>
+        <p>Current Round: {{ auction_data['current_round'] }}</p>
+        <p>You can bid on {{ 2 - user_data['bids'] }} more blocks.</p>
+        <p>You can skip {{ user_data['skips'] }} more rounds.</p>
+        
+        <h2>Auction Table</h2>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Round</th>
+                    <th>Block</th>
+                    <th>Start Price</th>
+                    <th>Bid Increment</th>
+                    <th>Bid</th>
+                    <th>Winner</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for block in ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
+                    <tr>
+                        <td>{{ auction_data['current_round'] }}</td>
+                        <td>{{ block }}</td>
+                        <td>{{ auction_data['start_price'] }}</td>
+                        <td>{{ auction_data['bid_increment'] }}</td>
+                        <td>
+                            <form action="{{ url_for('place_bid') }}" method="post" class="d-flex">
+                                <input type="hidden" name="user" value="{{ user }}">
+                                <input type="hidden" name="block" value="{{ block }}">
+                                <input type="number" name="amount" value="{{ auction_data['start_price'] + auction_data['bid_increment'] }}" class="form-control me-2" readonly>
+                                <button type="submit" class="btn btn-primary" {% if user_data['bids'] >= 2 %}disabled{% endif %}>Bid</button>
+                            </form>
+                        </td>
+                        <td>{% if auction_data['current_leaders'][block] == user %}You{% else %}Anonymous{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <h2>My Bids</h2>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Round</th>
+                    <th>Block</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bid in user_bids %}
+                    <tr>
+                        <td>{{ bid['round'] }}</td>
+                        <td>{{ bid['block'] }}</td>
+                        <td>{{ bid['amount'] }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <form action="{{ url_for('skip_round', username=user) }}" method="get">
+            <button type="submit" class="btn btn-warning" {% if user_data['skips'] <= 0 %}disabled{% endif %}>Skip Round</button>
+        </form>
+        {% if user_data['skips'] <= 0 %}
+            <p class="text-danger">You have to bid</p>
+        {% endif %}
+    </div>
+    <script>
+        let timer = document.getElementById('timer');
+        let timeLeft = {{ auction_data['round_time'] }};
+        setInterval(function() {
+            if (timeLeft > 0) {
+                timeLeft--;
+                timer.textContent = timeLeft + ' seconds';
+            }
+        }, 1000);
+
+        setInterval(function() {
+            fetch("{{ url_for('check_status') }}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'break') {
+                        location.reload();
+                    } else {
+                        for (let block in data.leaders) {
+                            let cell = document.querySelector(`td[data-block="${block}"]`);
+                            if (cell) {
+                                cell.textContent = data.leaders[block] === "{{ user }}" ? "You" : "Anonymous";
+                            }
+                        }
+                    }
+                });
+        }, 5000);
+    </script>
+</body>
+</html>

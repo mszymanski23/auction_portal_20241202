@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Użytkownika</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="user-container">
+        <h2>Witaj, {{ username }}</h2>
+        <p>Czas do końca rundy: {{ time_left }} sekund</p>
+
+        <h3>Wystawione bloki</h3>
+        <ul>
+            {% for block, bid in user_bids.items() %}
+                <li>{{ block }}: {{ bid }}</li>
+            {% endfor %}
+        </ul>
+
+        <h3>Składaj ofertę</h3>
+        <form action="{{ url_for('place_bid') }}" method="POST">
+            <label for="block">Wybierz blok:</label>
+            <select name="block">
+                {% for block in current_highest_bids.keys() %}
+                    <option value="{{ block }}">{{ block }}</option>
+                {% endfor %}
+            </select>
+            <label for="bid_amount">Kwota oferty:</label>
+            <input type="number" name="bid_amount" required>
+            <button type="submit">Złóż ofertę</button>
+        </form>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <ul>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</body>
+</html>

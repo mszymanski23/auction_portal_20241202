@@ -1,0 +1,25 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bid Summary</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Bid Summary</h1>
+    <table>
+        <tr>
+            <th>Round</th>
+            <th>Block</th>
+            <th>Amount</th>
+        </tr>
+        {% for bid in bids %}
+            <tr>
+                <td>{{ bid['round'] }}</td>
+                <td>{{ bid['block'] }}</td>
+                <td>{{ bid['amount'] }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

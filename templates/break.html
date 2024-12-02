@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Break Time</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Break Time</h1>
+    <p>Technical break in progress. Time left: <span id="break_timer"></span></p>
+    <script>
+        let breakTimer = document.getElementById('break_timer');
+        let breakTimeLeft = {{ auction_data['break_time'] }};
+        setInterval(function() {
+            if (breakTimeLeft > 0) {
+                breakTimeLeft--;
+                breakTimer.textContent = breakTimeLeft + ' seconds';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
