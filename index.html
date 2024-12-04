@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Auction Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 220px;
+            background-color: #5a2d82; /* Play's purple color */
+            color: white;
+            padding: 1rem;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem 0;
+        }
+        .sidebar a:hover {
+            background-color: #7a3da3; /* Slightly lighter purple for hover effect */
+        }
+        .content {
+            margin-left: 240px;
+            padding: 1rem;
+        }
+        .bg-primary {
+            background-color: #5a2d82 !important; /* Play's purple color */
+        }
+        .btn-primary {
+            background-color: #5a2d82;
+            border-color: #5a2d82;
+        }
+        .btn-primary:hover {
+            background-color: #7a3da3;
+            border-color: #7a3da3;
+        }
+    </style>
+</head>
+<body>
+    <div class="d-flex">
+        <div class="sidebar">
+            <h2>Auction System</h2>
+        </div>
+        <div class="content container">
+            <header class="bg-primary text-white text-center py-3 mb-4">
+                <h1>Auction system login panel</h1>
+            </header>
+            
+            <div class="mb-4">
+                <p>Welcome to the Auction System! Please select your username from the list below to log in. If the auction has already started, you will not be able to log in. Users who are already logged in or excluded from the auction will be indicated accordingly.</p>
+            </div>
+            
+            {% if auction_status == 'running' %}
+                <div class="alert alert-warning" role="alert">
+                    The auction has already started. You cannot log in anymore.
+                </div>
+            {% endif %}
+            
+            <div class="list-group">
+                {% for user in users %}
+                    {% if auction_status == 'running' %}
+                        <a href="#" class="list-group-item list-group-item-action disabled">{{ user }} <span class="badge bg-danger">Auction Running</span></a>
+                    {% elif user in logged_in_users %}
+                        <a href="#" class="list-group-item list-group-item-action disabled">{{ user }} <span class="badge bg-success">Logged in</span></a>
+                    {% elif logged_in_users.get(user, {}).get('active', True) == False %}
+                        <a href="#" class="list-group-item list-group-item-action disabled">{{ user }} <span class="badge bg-danger">Excluded</span></a>
+                    {% else %}
+                        <a href="{{ url_for('login', username=user) }}" class="list-group-item list-group-item-action">{{ user }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            
+            <!-- Button to trigger modal -->
+            <button type="button" class="btn btn-info mt-4" data-bs-toggle="modal" data-bs-target="#systemDescriptionModal">
+                System Description
+            </button>
+            
+            <!-- Modal -->
+            <div class="modal fade" id="systemDescriptionModal" tabindex="-1" aria-labelledby="systemDescriptionModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="systemDescriptionModalLabel">Auction System Description</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>The auction system is a web-based application built using Flask, designed to facilitate and manage auctions. Below is a detailed description of its components and functionalities:</p>
+                            <h6>User Management</h6>
+                            <ul>
+                                <li><strong>Users:</strong> The system maintains a list of users who can participate in the auction.</li>
+                                <li><strong>Login:</strong> Users can log in to the system by selecting their username from a list. If the auction has already started, new logins are disabled.</li>
+                                <li><strong>Logged-in Users:</strong> The system tracks logged-in users and their activity, including the number of bids placed and the number of rounds they can skip.</li>
+                            </ul>
+                            <h6>Auction Management</h6>
+                            <ul>
+                                <li><strong>Auction Data:</strong> The system maintains detailed auction data, including the current round, status (running or waiting), start price, bid increment, and the current leaders for each block.</li>
+                                <li><strong>Blocks:</strong> The auction involves multiple blocks (A to G), each with its own start price and bid increment.</li>
+                            </ul>
+                            <h6>Admin Panel</h6>
+                            <ul>
+                                <li><strong>Start Auction:</strong> Admins can start a new auction, resetting all relevant data and setting the auction status to running.</li>
+                                <li><strong>End Round:</strong> Admins can end the current round, triggering the determination of winners and updating the auction table.</li>
+                                <li><strong>Send Results:</strong> Admins can send the results of the auction, resetting the bids for the next round.</li>
+                            </ul>
+                            <h6>User Panel</h6>
+                            <ul>
+                                <li><strong>Bid Placement:</strong> Users can place bids on available blocks. Each user is limited to a maximum of two bids per round.</li>
+                                <li><strong>Skip Round:</strong> Users can skip a round if they have remaining skips.</li>
+                                <li><strong>Bid Tracking:</strong> Users can view their bid history and see the current leaders for each block.</li>
+                            </ul>
+                            <h6>Auction Logic</h6>
+                            <ul>
+                                <li><strong>Bid Processing:</strong> When a user places a bid, it is recorded, and the user becomes the current leader for that block if their bid is the highest.</li>
+                                <li><strong>Winner Determination:</strong> At the end of each round, the system determines the winners for each block based on the highest bids. In case of a tie, a random winner is selected.</li>
+                                <li><strong>Auction Table Update:</strong> The start price and bid increment for each block are updated based on the winning bids.</li>
+                            </ul>
+                            <h6>Logging</h6>
+                            <ul>
+                                <li><strong>Console and File Logging:</strong> The system logs important events and actions to both the console and a file (`auction_system.log`). This includes user logins, bid placements, round endings, and auction resets.</li>
+                            </ul>
+                            <h6>Status Checking</h6>
+                            <ul>
+                                <li><strong>Real-time Updates:</strong> The system provides real-time updates on the auction status, current round, and leaders for each block through a status check endpoint.</li>
+                            </ul>
+                            <h6>Example Usage</h6>
+                            <p>1. <strong>Admin starts the auction:</strong> The admin logs in and starts the auction, setting the status to running and initializing the first round.</p>
+                            <p>2. <strong>Users log in and place bids:</strong> Users log in, view the available blocks, and place their bids. They can also skip rounds if needed.</p>
+                            <p>3. <strong>Admin ends the round:</strong> The admin ends the current round, and the system determines the winners and updates the auction table.</p>
+                            <p>4. <strong>Results are sent:</strong> The admin sends the results, resetting the bids for the next round, and the auction continues.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class="bg-light text-center py-3 mt-4">
+        <p>&copy; 2024 Auction System All Rights Reserved powered by marcin.szymanski2@play.pl</p>
+        <p>&copy; Build 1.0 2024/12/05</p>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+Y5q5Y5n5Y5n5Y5" crossorigin="anonymous"></script>
+</body>
+</html>
