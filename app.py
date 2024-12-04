@@ -2,6 +2,8 @@ import logging
 from flask import Flask, render_template, redirect, url_for, request, jsonify
 import random
 import time 
+import csv
+from flask import send_file
 
 app = Flask(__name__)
 
@@ -133,11 +135,31 @@ def place_bid():
     
     return redirect(url_for('user_panel', username=user))
 
+#@app.route('/skip_round/<username>')
+#def skip_round(username):
+#    if logged_in_users[username]['skips'] > 0:
+#        logged_in_users[username]['skips'] -= 1
+#        logger.info(f"User {username} skipped the round. Remaining skips: {logged_in_users[username]['skips']}")
+#    else:
+#        logger.warning(f"User {username} attempted to skip but has no skips left.")
+#    
+#    return redirect(url_for('user_panel', username=username))
+
 @app.route('/skip_round/<username>')
 def skip_round(username):
+    # Check if the user has skips remaining
     if logged_in_users[username]['skips'] > 0:
         logged_in_users[username]['skips'] -= 1
         logger.info(f"User {username} skipped the round. Remaining skips: {logged_in_users[username]['skips']}")
+        
+        # Add a special bid to indicate skipping
+        auction_data['bids'].append({
+            'user': username,
+            'block': 'A',
+            'amount': 0,
+            'round': auction_data['current_round'],
+            'is_success': 'skipped'
+        })
     else:
         logger.warning(f"User {username} attempted to skip but has no skips left.")
     
@@ -225,6 +247,30 @@ def get_remaining_time():
         return 0  # No active round
     elapsed_time = time.time() - auction_data['round_start_time']
     return max(0, auction_data['round_time'] - int(elapsed_time))
+
+@app.route('/export_auction_table')
+def export_auction_table():
+    # Create a CSV file with the auction table
+    csv_file = 'auction_table.csv'
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Block', 'Start Price', 'Winner'])
+        for block, data in auction_data['block_data'].items():
+            writer.writerow([block, data['start_price'], auction_data['current_leaders'][block]])
+    
+    return send_file(csv_file, as_attachment=True)
+
+@app.route('/export_my_bids/<username>')
+def export_my_bids(username):
+    # Create a CSV file with the user's bids
+    csv_file = f'{username}_bids.csv'
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Round', 'Block', 'Amount', 'User' ,'Status'])
+        for bid in auction_data['bids']:
+            writer.writerow([bid['round'], bid['block'], bid['amount'], bid['user'],bid['is_success'] ])
+    
+    return send_file(csv_file, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=False)
