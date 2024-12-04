@@ -1,7 +1,29 @@
+import logging
 from flask import Flask, render_template, redirect, url_for, request, jsonify
 import random
 
 app = Flask(__name__)
+
+# Set up logging
+logger = logging.getLogger()
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.Error)  # Ustawienie logowania na ERROR, żeby wyciszyć INFO i DEBUG
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)  # Log everything from DEBUG level and above
+console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+
+# File handler
+file_handler = logging.FileHandler('auction_system.log')
+file_handler.setLevel(logging.DEBUG)  # Log everything from DEBUG level and above
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+
+# Add both handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 # Lista użytkowników
 users = ['telekom1', 'telekom2', 'telekom3', 'telekom4']
@@ -9,13 +31,22 @@ logged_in_users = {}
 auction_data = {
     'round_time': 60,
     'break_time': 30,
-    'start_price': 10,
-    'bid_increment': 10,
+    'start_price': 356000,
+    'bid_increment': 7120,
     'current_round': 0,
     'status': 'waiting',
     'bids': [],
     'results': [],
-    'current_leaders': {block: None for block in ['A', 'B', 'C', 'D', 'E', 'F', 'G']}
+    'current_leaders': {block: None for block in ['A', 'B', 'C', 'D', 'E', 'F', 'G']},
+    'block_data': {
+        'A': {'start_price': 356000, 'bid_increment': 7120},
+        'B': {'start_price': 356000, 'bid_increment': 7120},
+        'C': {'start_price': 356000, 'bid_increment': 7120},
+        'D': {'start_price': 356000, 'bid_increment': 7120},
+        'E': {'start_price': 356000, 'bid_increment': 7120},
+        'F': {'start_price': 356000, 'bid_increment': 7120},
+        'G': {'start_price': 356000, 'bid_increment': 7120}
+    }
 }
 
 @app.route('/')
@@ -24,6 +55,11 @@ def index():
 
 @app.route('/login/<username>')
 def login(username):
+    if username not in users:
+        logger.warning(f"Login attempt for non-existent user: {username}")
+        return "User does not exist."
+    
+    logger.info(f"User {username} logged in.")
     logged_in_users[username] = {'bids': 0, 'active': True, 'skips': 2}
     return redirect(url_for('user_panel', username=username))
 
@@ -31,20 +67,40 @@ def login(username):
 def user_panel(username):
     if not logged_in_users[username]['active']:
         return "You have been excluded from the auction for not bidding in the first round."
+    
     user_bids = [bid for bid in auction_data['bids'] if bid['user'] == username]
-    return render_template('user.html', user=username, auction_data=auction_data, user_bids=user_bids, user_data=logged_in_users[username])
+    
+    # Liczenie liczby bloków, w których użytkownik jest liderem
+    user_leads = sum(1 for block, leader in auction_data['current_leaders'].items() if leader == username)
+    
+    # Obliczanie liczby dostępnych ofert
+    # Odejmujemy zarówno liczbę bloków, na których użytkownik prowadzi, jak i już złożone oferty
+    available_bids = max(2 - user_leads - logged_in_users[username]['bids'], 0)
+    
+    return render_template('user.html', 
+                           user=username, 
+                           auction_data=auction_data, 
+                           user_bids=user_bids, 
+                           user_data=logged_in_users[username], 
+                           available_bids=available_bids)
+
+
 
 @app.route('/admin')
 def admin():
+    logger.info("Rendering admin panel.")
     return render_template('admin.html', auction_data=auction_data, logged_in_users=logged_in_users)
 
 @app.route('/start_auction')
 def start_auction():
+    logger.info("Starting a new auction.")
     auction_data['current_round'] = 1
     auction_data['status'] = 'running'
     auction_data['bids'] = []
     auction_data['results'] = []
     auction_data['current_leaders'] = {block: None for block in ['A', 'B', 'C', 'D', 'E', 'F', 'G']}
+    
+    logger.debug(f"Auction data reset: {auction_data}")
     return redirect(url_for('admin'))
 
 @app.route('/place_bid', methods=['POST'])
@@ -52,54 +108,88 @@ def place_bid():
     user = request.form['user']
     block = request.form['block']
     amount = auction_data['start_price'] + auction_data['bid_increment']
+    
     if logged_in_users[user]['bids'] < 2:
         auction_data['bids'].append({'user': user, 'block': block, 'amount': amount, 'round': auction_data['current_round']})
         logged_in_users[user]['bids'] += 1
         auction_data['current_leaders'][block] = user
+        print(f' auction_data: {auction_data}')
+        logger.info(f"User {user} placed a bid of {amount} on block {block}.")
+        logger.info(f"User auction_data: {auction_data}'")
+    else:
+        logger.warning(f"User {user} attempted to place a bid but reached their bid limit.")
+    
     return redirect(url_for('user_panel', username=user))
 
 @app.route('/skip_round/<username>')
 def skip_round(username):
     if logged_in_users[username]['skips'] > 0:
         logged_in_users[username]['skips'] -= 1
+        logger.info(f"User {username} skipped the round. Remaining skips: {logged_in_users[username]['skips']}")
+    else:
+        logger.warning(f"User {username} attempted to skip but has no skips left.")
+    
     return redirect(url_for('user_panel', username=username))
 
 @app.route('/end_round')
 def end_round():
     auction_data['status'] = 'break'
     auction_data['current_round'] += 1
+    logger.info(f"Round {auction_data['current_round']} ended. Determining winners...")
     determine_winners()
     update_auction_table()
+    logger.info("Round results updated, auction table refreshed.")
     return redirect(url_for('admin'))
 
 def determine_winners():
     results = {}
     for bid in auction_data['bids']:
+        bid['is_success'] = "no"
         block = bid['block']
         if block not in results:
             results[block] = []
         results[block].append(bid)
     
+    auction_data['results'] = []
     for block, bids in results.items():
-        if len(bids) > 1:
-            winner = random.choice(bids)
+        if len(bids) == 0:
+            auction_data['current_leaders'][block] = None
         else:
-            winner = bids[0]
-        auction_data['results'].append(winner)
-        auction_data['current_leaders'][block] = winner['user']
+            sorted_bids = sorted(bids, key=lambda x: x['amount'], reverse=True)
+            max_amount = sorted_bids[0]['amount']
+            highest_bids = [bid for bid in sorted_bids if bid['amount'] == max_amount]
+            
+            if len(highest_bids) > 1:
+                winner = random.choice(highest_bids)
+            else:
+                winner = highest_bids[0]
+            
+            for bid in bids:
+                if bid == winner:
+                    bid['is_success'] = "yes"
+            
+            auction_data['results'].append(winner)
+            auction_data['current_leaders'][block] = winner['user']
+
 
 def update_auction_table():
+    """
+    Aktualizuje dane `start_price` i `bid_increment` dla każdego bloku w `block_data` oraz loguje te zmiany.
+    """
     for result in auction_data['results']:
         block = result['block']
-        auction_data['start_price'] = result['amount']
-        auction_data['bid_increment'] = result['amount'] * 0.1
+        # Aktualizuj cenę początkową i przyrost dla konkretnego bloku
+        auction_data['block_data'][block]['start_price'] = result['amount']
+        auction_data['block_data'][block]['bid_increment'] = result['amount'] * 0.1  # 10% przyrost
+        logger.debug(f"Updated auction table for block {block}: Start Price = {auction_data['block_data'][block]['start_price']}, Bid Increment = {auction_data['block_data'][block]['bid_increment']}")
 
 @app.route('/send_results')
 def send_results():
     auction_data['status'] = 'running'
-    auction_data['bids'] = []
+    #auction_data['bids'] = []
     for user in logged_in_users:
         logged_in_users[user]['bids'] = 0
+    logger.info("Auction results sent and auction reset.")
     return redirect(url_for('admin'))
 
 @app.route('/check_status')
@@ -107,4 +197,4 @@ def check_status():
     return jsonify(status=auction_data['status'], round=auction_data['current_round'], leaders=auction_data['current_leaders'])
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
