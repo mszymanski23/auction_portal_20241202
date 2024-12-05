@@ -78,8 +78,20 @@
                         </tr>
                     </tbody>
                 </table>
+            
             </div>
 
+            {% if auction_data['status'] == 'finished' %}
+                <div id="auction-results">
+                    <h2>Auction Results exporting </h2>
+                    <a href="{{ url_for('export_auction_table') }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Export Auction Table
+                    </a>
+                    <a href="{{ url_for('export_my_bids', username=user) }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Export My Bids
+                    </a>
+                </div>
+            {% endif %}
             <!-- Auction Table -->
             <div id="auction-table">
                 <h2>Auction Table</h2>
@@ -117,6 +129,7 @@
                 </table>
             </div>
 
+
             <!-- My Bids -->
             <div id="my-bids">
                 <h2>My Bids</h2>
@@ -151,7 +164,7 @@
             </div>
 
             <!-- Skip Round -->
-            <div id="skip-round">
+            <!-- <div id="skip-round">
                 <form action="{{ url_for('skip_round', username=user) }}" method="get">
                     <button type="submit" class="btn btn-warning" {% if user_data['skips'] <= 0 or auction_data['status'] != 'running' %}disabled{% endif %}>
                         <i class="fas fa-forward"></i> Skip Round
@@ -160,32 +173,8 @@
                 {% if user_data['skips'] <= 0 %}
                     <p class="text-danger">You have no skips left.</p>
                 {% endif %}
-            </div>
+            </div>-->
 
-            <!-- Auction Results -->
-            {% if auction_data['status'] == 'finished' %}
-                <div id="auction-results">
-                    <h2>Auction Results</h2>
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Block</th>
-                                <th>Winner</th>
-                                <th>Winning Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for result in auction_data['results'] %}
-                                <tr>
-                                    <td>{{ result['block'] }}</td>
-                                    <td>{{ result['user'] }}</td>
-                                    <td>{{ result['amount'] }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endif %}
         </div>
     </div>
 

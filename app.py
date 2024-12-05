@@ -1,9 +1,10 @@
 import logging
 from flask import Flask, render_template, redirect, url_for, request, jsonify
 import random
-import time 
+import time
 import csv
 from flask import send_file
+import io
 
 app = Flask(__name__)
 
@@ -61,7 +62,7 @@ def login(username):
     if username not in users:
         logger.warning(f"Login attempt for non-existent user: {username}")
         return "User does not exist."
-    
+
     logger.info(f"User {username} logged in.")
     logged_in_users[username] = {'bids': 0, 'active': True, 'skips': 2}
     return redirect(url_for('user_panel', username=username))
@@ -72,24 +73,24 @@ def user_panel(username):
     if username not in logged_in_users:
         logger.warning(f"Unauthorized access attempt by user: {username}")
         return redirect(url_for('index'))  # Redirect to the index page
-    
-    
+
+
     if not logged_in_users[username]['active']:
         return "You have been excluded from the auction for not bidding in the first round."
-    
+
     #user_bids = [bid for bid in auction_data['bids'] if bid['user'] == username] # passing bids only made by user
     #user_bids = [bid for bid in auction_data['bids'] ] # passing all bids
     user_bids = [bid for bid in auction_data['bids'] if bid['round'] < auction_data['current_round'] or (bid['user'] == username and bid['round'] == auction_data['current_round'])]
-    
+
     available_bids = 2
     remaining_time = get_remaining_time()  # Calculate remaining time dynamically
     logger.warning(f"remaining_time: {remaining_time}")
-    
-    return render_template('user.html', 
-                           user=username, 
-                           auction_data=auction_data, 
-                           user_bids=user_bids, 
-                           user_data=logged_in_users[username], 
+
+    return render_template('user.html',
+                           user=username,
+                           auction_data=auction_data,
+                           user_bids=user_bids,
+                           user_data=logged_in_users[username],
                            available_bids=available_bids,
                            remaining_time=remaining_time
                            )
@@ -122,7 +123,7 @@ def place_bid():
     user = request.form['user']
     block = request.form['block']
     amount = auction_data['block_data'][block]['start_price'] + auction_data['block_data'][block]['bid_increment']
-    
+
     if logged_in_users[user]['bids'] < 2:
         auction_data['bids'].append({'user': user, 'block': block, 'amount': amount, 'round': auction_data['current_round']})
         logged_in_users[user]['bids'] += 1
@@ -132,7 +133,7 @@ def place_bid():
         logger.info(f"User auction_data: {auction_data}'")
     else:
         logger.warning(f"User {user} attempted to place a bid but reached their bid limit.")
-    
+
     return redirect(url_for('user_panel', username=user))
 
 #@app.route('/skip_round/<username>')
@@ -142,7 +143,7 @@ def place_bid():
 #        logger.info(f"User {username} skipped the round. Remaining skips: {logged_in_users[username]['skips']}")
 #    else:
 #        logger.warning(f"User {username} attempted to skip but has no skips left.")
-#    
+#
 #    return redirect(url_for('user_panel', username=username))
 
 @app.route('/skip_round/<username>')
@@ -151,7 +152,7 @@ def skip_round(username):
     if logged_in_users[username]['skips'] > 0:
         logged_in_users[username]['skips'] -= 1
         logger.info(f"User {username} skipped the round. Remaining skips: {logged_in_users[username]['skips']}")
-        
+
         # Add a special bid to indicate skipping
         auction_data['bids'].append({
             'user': username,
@@ -162,7 +163,7 @@ def skip_round(username):
         })
     else:
         logger.warning(f"User {username} attempted to skip but has no skips left.")
-    
+
     return redirect(url_for('user_panel', username=username))
 
 @app.route('/end_round')
@@ -171,14 +172,14 @@ def end_round():
     auction_data['current_round'] += 1
     logger.info(f"Round {auction_data['current_round']} ended. Determining winners...")
     determine_winners()
-    
+
     # Check if no bids were placed during the last round
     previous_round_bids = [bid for bid in auction_data['bids'] if bid['round'] == auction_data['current_round'] - 1]
     if not previous_round_bids:
         logger.info("No bids were placed during the last round. Ending the auction.")
         auction_data['status'] = 'finished'
         return redirect(url_for('admin'))  # Redirect to the admin panel to show the auction has ended
-    
+
     update_auction_table()
     auction_data['round_start_time'] = time.time()  # Update the round start time for the new round
     logger.info("Round results updated, auction table refreshed.")
@@ -188,14 +189,14 @@ def determine_winners():
     results = {}
     # Only consider bids from the previous round
     previous_round_bids = [bid for bid in auction_data['bids'] if bid['round'] == auction_data['current_round'] - 1]
-    
+
     for bid in previous_round_bids:
         bid['is_success'] = "no"
         block = bid['block']
         if block not in results:
             results[block] = []
         results[block].append(bid)
-    
+
     auction_data['results'] = []
     for block, bids in results.items():
         if len(bids) == 0:
@@ -205,17 +206,17 @@ def determine_winners():
             sorted_bids = sorted(bids, key=lambda x: x['amount'], reverse=True)
             max_amount = sorted_bids[0]['amount']
             highest_bids = [bid for bid in sorted_bids if bid['amount'] == max_amount]
-            
+
             # Handle ties by selecting a random winner
             if len(highest_bids) > 1:
                 winner = random.choice(highest_bids)
             else:
                 winner = highest_bids[0]
-            
+
             for bid in bids:
                 if bid == winner:
                     bid['is_success'] = "yes"
-            
+
             auction_data['results'].append(winner)
             auction_data['current_leaders'][block] = winner['user']
 
@@ -225,7 +226,7 @@ def update_auction_table():
         block = result['block']
         # Aktualizuj cenę początkową i przyrost dla konkretnego bloku
         auction_data['block_data'][block]['start_price'] = result['amount']
-        auction_data['block_data'][block]['bid_increment'] = round(result['amount'] * 0.02) 
+        auction_data['block_data'][block]['bid_increment'] = round(result['amount'] * 0.02)
         logger.debug(f"Updated auction table for block {block}: Start Price = {auction_data['block_data'][block]['start_price']}, Bid Increment = {auction_data['block_data'][block]['bid_increment']}")
 
 @app.route('/send_results')
@@ -251,26 +252,49 @@ def get_remaining_time():
 @app.route('/export_auction_table')
 def export_auction_table():
     # Create a CSV file with the auction table
-    csv_file = 'auction_table.csv'
-    with open(csv_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Block', 'Start Price', 'Winner'])
-        for block, data in auction_data['block_data'].items():
-            writer.writerow([block, data['start_price'], auction_data['current_leaders'][block]])
-    
-    return send_file(csv_file, as_attachment=True)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(['Block', 'Final Price', 'Winner']) # Header row
+    for block, data in auction_data['block_data'].items():
+        writer.writerow([block, data['start_price'], auction_data['current_leaders'][block]])
+
+    # Prepare the in-memory file for sending
+    csv_buffer.seek(0)  # Move the cursor to the start of the file
+    return send_file(
+        io.BytesIO(csv_buffer.getvalue().encode('utf-8')),  # Convert StringIO content to bytes
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f"auction_table_results.csv"
+    )
 
 @app.route('/export_my_bids/<username>')
 def export_my_bids(username):
-    # Create a CSV file with the user's bids
-    csv_file = f'{username}_bids.csv'
-    with open(csv_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Round', 'Block', 'Amount', 'User' ,'Status'])
-        for bid in auction_data['bids']:
-            writer.writerow([bid['round'], bid['block'], bid['amount'], bid['user'],bid['is_success'] ])
-    
-    return send_file(csv_file, as_attachment=True)
+    # Validate the username
+    if username not in logged_in_users:
+        logger.warning(f"Export attempt for non-existent user: {username}")
+        #return abort(404, description="User does not exist.")
+
+    # Filter the user's bids
+    user_bids = [bid for bid in auction_data['bids']]
+    if not user_bids:
+        logger.info(f"No bids found for user: {username}")
+        #return abort(404, description="No bids available for export.")
+
+    # Create an in-memory CSV file
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(['Round', 'Block', 'Amount', 'User', 'Status'])  # Header row
+    for bid in user_bids:
+        writer.writerow([bid['round'], bid['block'], bid['amount'], bid['user'], bid['is_success']])
+
+    # Prepare the in-memory file for sending
+    csv_buffer.seek(0)  # Move the cursor to the start of the file
+    return send_file(
+        io.BytesIO(csv_buffer.getvalue().encode('utf-8')),  # Convert StringIO content to bytes
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f"{username}_bids.csv"
+    )
 
 if __name__ == '__main__':
     app.run(debug=False)
